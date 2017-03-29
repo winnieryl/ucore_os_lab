@@ -176,6 +176,33 @@ trap_dispatch(struct trapframe *tf) {
     case IRQ_OFFSET + IRQ_KBD:
         c = cons_getc();
         cprintf("kbd [%03d] %c\n", c, c);
+        /* lab1 challenge 2. use '0' and '3' to control kernel mode or user mode */
+        switch (c){
+        case '3':
+            if (tf->tf_cs != USER_CS){
+                tf->tf_cs = USER_CS;
+                tf->tf_ds = tf->tf_es = tf->tf_ss = USER_DS;
+
+                // set eflags, make sure ucore can use io under user mode.
+                // if CPL > IOPL, then cpu will generate a general protection.
+                tf->tf_eflags |= FL_IOPL_MASK;
+
+                cprintf("+++ switch to  user  mode +++\n");
+                print_trapframe(tf);
+            }
+            break;
+        case '0':
+            if (tf->tf_cs != KERNEL_CS) {
+                tf->tf_cs = KERNEL_CS;
+                tf->tf_ds = tf->tf_es = KERNEL_DS;
+                tf->tf_eflags &= ~FL_IOPL_MASK;
+                cprintf("+++ switch to kernel mode +++\n");
+                print_trapframe(tf);
+            }
+            break;
+        default:
+            break;
+        }
         break;
     //LAB1 CHALLENGE 1 : YOUR CODE you should modify below codes.
     case T_SWITCH_TOU:
@@ -193,6 +220,7 @@ trap_dispatch(struct trapframe *tf) {
             // then iret will jump to the right stack
             *((uint32_t *)tf - 1) = (uint32_t)&switchk2u;
         }
+        break;
     case T_SWITCH_TOK:
         if (tf->tf_cs != KERNEL_CS) {
             tf->tf_cs = KERNEL_CS;
